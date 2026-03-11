@@ -1,23 +1,10 @@
 import type { ConfigRow, DailyLogRow, CategoryProgress } from '../types'
 
 export function computeStreaks(log: DailyLogRow[]): { flashcard: number; gym: number } {
-  const sorted = [...log].sort((a, b) => a.day_number - b.day_number)
-  let flashcard = 0
-  let gym = 0
-
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const row = sorted[i]
-    if (flashcard === sorted.length - 1 - i && row.flashcard_done) flashcard++
-    else if (flashcard > 0) break
-    else if (!row.flashcard_done && i === sorted.length - 1) break
+  return {
+    flashcard: computeStreakForField(log, 'flashcard_done'),
+    gym: computeStreakForField(log, 'gym_done'),
   }
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const row = sorted[i]
-    if (gym === sorted.length - 1 - i && row.gym_done) gym++
-    else if (gym > 0) break
-    else if (!row.gym_done && i === sorted.length - 1) break
-  }
-  return { flashcard, gym }
 }
 
 export function computeStreakForField(
