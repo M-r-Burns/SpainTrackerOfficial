@@ -66,7 +66,13 @@ async function requestToken(payload: TokenRequest): Promise<TokenResponse> {
     }
 
     throw new Error(`Token exchange failed: ${JSON.stringify(data)}`)
-  } catch {
+  } catch (e) {
+    // local dev fallback only when the Pages Function route is unavailable
+    if (e instanceof TypeError || (e instanceof Error && /Failed to fetch/i.test(e.message))) {
+      return requestTokenDirect(payload)
+    }
+
+    if (e instanceof Error) throw e
     return requestTokenDirect(payload)
   }
 }
