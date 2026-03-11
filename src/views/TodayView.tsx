@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, RefreshCw, Save } from 'lucide-react'
 import { useProgressStore } from '../store/useProgressStore'
 import StreakCounter from '../components/StreakCounter'
+import type { DailyLogRow } from '../types'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -47,16 +48,39 @@ export default function TodayView() {
   const today = new Date()
   const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const classLabel = todayRow?.is_morning_class ? '🌅 Morning Class' : todayRow?.is_class_day ? '🌆 Afternoon Class' : '🏠 No Class Today'
+  const fallbackRow: DailyLogRow = {
+    day_number: currentDayNumber,
+    week_number: currentWeekNumber,
+    date: today.toISOString().split('T')[0],
+    day_of_week: today.toLocaleDateString('en-US', { weekday: 'long' }),
+    is_class_day: [1, 2, 3, 4, 5].includes(today.getDay()),
+    is_morning_class: [1, 3, 5].includes(today.getDay()),
+    book_chapter_completed: false,
+    podcast_done: 0,
+    flashcard_done: false,
+    class_attended: false,
+    conversations_count: 0,
+    duolingo_test_score: null,
+    walk_used_for_listening: false,
+    app_hours: 0,
+    job_apps_sent: 0,
+    gym_done: false,
+    life_event: '',
+    energy_level: null,
+    notes: '',
+  }
 
-  function updateField<K extends keyof NonNullable<typeof todayRow>>(key: K, value: NonNullable<typeof todayRow>[K]) {
+  const activeRow = todayRow ?? fallbackRow
+
+  const classLabel = activeRow.is_morning_class ? '🌅 Morning Class' : activeRow.is_class_day ? '🌆 Afternoon Class' : '🏠 No Class Today'
+
+  function updateField<K extends keyof DailyLogRow>(key: K, value: DailyLogRow[K]) {
     setDirty(true)
     updateTodayField(key, value)
   }
 
   async function handleSave() {
-    if (!todayRow) return
-    await saveDay(todayRow)
+    await saveDay(activeRow)
     setDirty(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -73,26 +97,19 @@ export default function TodayView() {
     )
   }
 
-  if (!todayRow) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 p-6">
-        <RefreshCw size={32} className={`text-[#E94560] ${syncing ? 'animate-spin' : ''}`} />
-        <p className="text-[#B0BEC5]">{syncing ? 'Loading data…' : 'No data for today. Tap to sync.'}</p>
-        {!syncing && <button onClick={syncData} className="bg-[#E94560] text-white px-6 py-3 rounded-xl font-semibold">Sync Now</button>}
-      </div>
-    )
-  }
-
   return (
-    <motion.div className="p-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="mb-6 bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-5">
+    <motion.div className="p-4 relative overflow-hidden" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="pointer-events-none absolute -top-16 -right-12 h-44 w-44 bg-[#E94560]/20 blur-3xl rounded-full" />
+      <div className="pointer-events-none absolute top-40 -left-10 h-36 w-36 bg-[#1565C0]/20 blur-3xl rounded-full" />
+
+      <div className="mb-6 bg-gradient-to-br from-[#1A1A2E] to-[#16213E] border border-[#16213E] rounded-3xl p-5 shadow-2xl">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-[#B0BEC5]">{dateStr}</span>
           <button onClick={syncData} disabled={syncing} className="text-[#B0BEC5] hover:text-white transition-colors" aria-label="Sync data">
             <RefreshCw size={16} className={syncing ? 'animate-spin text-[#E94560]' : ''} />
           </button>
         </div>
-        <h1 className="text-2xl font-bold text-white">Home Dashboard</h1>
+        <h1 className="text-3xl font-bold text-white tracking-tight">Home Dashboard</h1>
         <p className="text-sm text-[#B0BEC5] mt-1">Day {currentDayNumber} of 112 — Week {currentWeekNumber}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {weekConfig && <span className="inline-block text-xs bg-[#E94560]/15 border border-[#E94560]/30 px-3 py-1 rounded-full text-[#E94560]">{weekConfig.phase}</span>}
@@ -105,35 +122,35 @@ export default function TodayView() {
         <StreakCounter count={gymStreak} emoji="💪" label="Gym Streak" />
       </div>
 
-      <div className="bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-4 space-y-3 mb-6">
+      <div className="bg-[#1A1A2E]/95 backdrop-blur border border-[#16213E] rounded-2xl p-4 space-y-3 mb-6 shadow-xl">
         <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider">Daily Tasks</h2>
-        <Toggle checked={todayRow.flashcard_done} onChange={v => updateField('flashcard_done', v)} label="🃏 Flashcards done" />
-        {todayRow.is_class_day && (
-          <Toggle checked={todayRow.class_attended} onChange={v => updateField('class_attended', v)} label="📚 Class attended" />
+        <Toggle checked={activeRow.flashcard_done} onChange={v => updateField('flashcard_done', v)} label="🃏 Flashcards done" />
+        {activeRow.is_class_day && (
+          <Toggle checked={activeRow.class_attended} onChange={v => updateField('class_attended', v)} label="📚 Class attended" />
         )}
-        <Toggle checked={todayRow.gym_done} onChange={v => updateField('gym_done', v)} label="💪 Gym done" />
-        <Toggle checked={todayRow.book_chapter_completed} onChange={v => updateField('book_chapter_completed', v)} label="📖 Book chapter" />
-        <Toggle checked={todayRow.walk_used_for_listening} onChange={v => updateField('walk_used_for_listening', v)} label="🎧 Walk for listening" />
+        <Toggle checked={activeRow.gym_done} onChange={v => updateField('gym_done', v)} label="💪 Gym done" />
+        <Toggle checked={activeRow.book_chapter_completed} onChange={v => updateField('book_chapter_completed', v)} label="📖 Book chapter" />
+        <Toggle checked={activeRow.walk_used_for_listening} onChange={v => updateField('walk_used_for_listening', v)} label="🎧 Walk for listening" />
       </div>
 
-      <div className="bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-4 space-y-3 mb-6">
+      <div className="bg-[#1A1A2E]/95 backdrop-blur border border-[#16213E] rounded-2xl p-4 space-y-3 mb-6 shadow-xl">
         <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider">Track Numbers</h2>
-        <NumberInput value={todayRow.app_hours} onChange={v => updateField('app_hours', v)} label="App Dev Hours" unit="h" step={0.5} />
-        <NumberInput value={todayRow.job_apps_sent} onChange={v => updateField('job_apps_sent', v)} label="Job Applications Sent" />
-        <NumberInput value={todayRow.conversations_count} onChange={v => updateField('conversations_count', v)} label="Spanish Conversations" />
-        <NumberInput value={todayRow.podcast_done} onChange={v => updateField('podcast_done', v)} label="Podcast Hours" unit="h" step={0.5} />
+        <NumberInput value={activeRow.app_hours} onChange={v => updateField('app_hours', v)} label="App Dev Hours" unit="h" step={0.5} />
+        <NumberInput value={activeRow.job_apps_sent} onChange={v => updateField('job_apps_sent', v)} label="Job Applications Sent" />
+        <NumberInput value={activeRow.conversations_count} onChange={v => updateField('conversations_count', v)} label="Spanish Conversations" />
+        <NumberInput value={activeRow.podcast_done} onChange={v => updateField('podcast_done', v)} label="Podcast Hours" unit="h" step={0.5} />
       </div>
 
-      <div className="bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-4 mb-6">
+      <div className="bg-[#1A1A2E]/95 backdrop-blur border border-[#16213E] rounded-2xl p-4 mb-6 shadow-xl">
         <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider mb-3">Notes</h2>
         <input
-          value={todayRow.life_event}
+          value={activeRow.life_event}
           onChange={e => updateField('life_event', e.target.value)}
           placeholder="Life event (optional)"
           className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm mb-3 outline-none focus:ring-2 focus:ring-[#E94560]/50"
         />
         <textarea
-          value={todayRow.notes}
+          value={activeRow.notes}
           onChange={e => updateField('notes', e.target.value)}
           placeholder="How was your day?"
           rows={3}
@@ -141,12 +158,12 @@ export default function TodayView() {
         />
       </div>
 
-      <div className="bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-4 mb-6">
+      <div className="bg-[#1A1A2E]/95 backdrop-blur border border-[#16213E] rounded-2xl p-4 mb-6 shadow-xl">
         <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider mb-3">Energy & Score</h2>
         <div className="flex gap-2 mb-3">
           {[1, 2, 3, 4, 5].map(n => (
             <button key={n} onClick={() => updateField('energy_level', n)}
-              className={`flex-1 h-10 rounded-xl text-sm font-mono font-bold transition-all ${todayRow.energy_level === n ? 'bg-[#E94560] text-white' : 'bg-[#16213E] text-[#B0BEC5]'}`}>
+              className={`flex-1 h-10 rounded-xl text-sm font-mono font-bold transition-all ${activeRow.energy_level === n ? 'bg-[#E94560] text-white' : 'bg-[#16213E] text-[#B0BEC5]'}`}>
               {n}
             </button>
           ))}
@@ -156,7 +173,7 @@ export default function TodayView() {
           type="number"
           min={0}
           max={160}
-          value={todayRow.duolingo_test_score ?? ''}
+          value={activeRow.duolingo_test_score ?? ''}
           onChange={(e) => updateField('duolingo_test_score', e.target.value === '' ? null : Number(e.target.value))}
           placeholder="e.g. 110"
           className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"

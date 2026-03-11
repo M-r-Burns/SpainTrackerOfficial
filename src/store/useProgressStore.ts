@@ -14,6 +14,13 @@ interface ProgressStore extends AppState {
   gymStreak: number
 }
 
+function isValidIsoDate(value: string): boolean {
+  if (!value) return false
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00`)
+  return !Number.isNaN(date.getTime())
+}
+
 function getCurrentDayInfo(log: DailyLogRow[], startDate: string): { dayNumber: number; weekNumber: number } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -22,14 +29,16 @@ function getCurrentDayInfo(log: DailyLogRow[], startDate: string): { dayNumber: 
   const found = log.find(r => r.date === todayStr)
   if (found) return { dayNumber: found.day_number, weekNumber: found.week_number }
 
-  if (startDate) {
+  if (isValidIsoDate(startDate)) {
     const start = new Date(startDate)
     start.setHours(0, 0, 0, 0)
     const diffMs = today.getTime() - start.getTime()
     const diffDays = Math.floor(diffMs / 86400000)
     const dayNumber = diffDays + 1
     const weekNumber = Math.ceil(dayNumber / 7)
-    return { dayNumber: Math.max(1, Math.min(112, dayNumber)), weekNumber: Math.max(1, Math.min(16, weekNumber)) }
+    const safeDay = Number.isFinite(dayNumber) ? dayNumber : 1
+    const safeWeek = Number.isFinite(weekNumber) ? weekNumber : 1
+    return { dayNumber: Math.max(1, Math.min(112, safeDay)), weekNumber: Math.max(1, Math.min(16, safeWeek)) }
   }
   return { dayNumber: 1, weekNumber: 1 }
 }
@@ -41,10 +50,11 @@ function getTodayIsoDate(): string {
 }
 
 function getIsoDateFromStartDate(startDate: string, dayNumber: number): string {
-  if (!startDate) return getTodayIsoDate()
+  if (!isValidIsoDate(startDate) || !Number.isFinite(dayNumber)) return getTodayIsoDate()
   const start = new Date(startDate)
   start.setHours(0, 0, 0, 0)
   start.setDate(start.getDate() + (dayNumber - 1))
+  if (Number.isNaN(start.getTime())) return getTodayIsoDate()
   return start.toISOString().split('T')[0]
 }
 
@@ -53,15 +63,17 @@ function getDayOfWeek(dateIso: string): string {
 }
 
 function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate: string): DailyLogRow {
-  const date = getIsoDateFromStartDate(startDate, dayNumber)
+  const safeDay = Number.isFinite(dayNumber) ? Math.max(1, Math.min(112, Math.round(dayNumber))) : 1
+  const safeWeek = Number.isFinite(weekNumber) ? Math.max(1, Math.min(16, Math.round(weekNumber))) : 1
+  const date = getIsoDateFromStartDate(startDate, safeDay)
   const weekday = getDayOfWeek(date)
   const weekdayIndex = new Date(date).getDay()
   const isClassDay = weekdayIndex >= 1 && weekdayIndex <= 5
   const isMorningClass = weekdayIndex === 1 || weekdayIndex === 3 || weekdayIndex === 5
 
   return {
-    day_number: dayNumber,
-    week_number: weekNumber,
+    day_number: safeDay,
+    week_number: safeWeek,
     date,
     day_of_week: weekday,
     is_class_day: isClassDay,
@@ -80,6 +92,15 @@ function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate:
     energy_level: null,
     notes: '',
   }
+}
+
+function resolveTodayRow(log: DailyLogRow[], dayNumber: number, weekNumber: number, startDate: string): DailyLogRow {
+  const today = getTodayIsoDate()
+  return (
+    log.find(r => r.date === today) ??
+    log.find(r => r.day_number === dayNumber) ??
+    createDefaultDailyRow(dayNumber, weekNumber, startDate)
+  )
 }
 
 function dailyRowToArray(row: DailyLogRow): (string | number | boolean)[] {
@@ -148,13 +169,9 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
         fetchDailyLog(accessToken, sheetId),
         getStartDate(accessToken, sheetId),
       ])
-      const activeStartDate = fetchedStartDate || get().startDate
+      const activeStartDate = isValidIsoDate(fetchedStartDate) ? fetchedStartDate : get().startDate
       const { dayNumber, weekNumber } = getCurrentDayInfo(log, activeStartDate)
-      const today = getTodayIsoDate()
-      const todayRow =
-        log.find(r => r.date === today) ??
-        log.find(r => r.day_number === dayNumber) ??
-        createDefaultDailyRow(dayNumber, weekNumber, activeStartDate)
+      const todayRow = resolveTodayRow(log, dayNumber, weekNumber, activeStartDate)
       const flashcardStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'flashcard_done')
       const gymStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'gym_done')
       set({
@@ -170,20 +187,26 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
         syncing: false,
       })
     } catch (e) {
-      set({ error: (e as Error).message, syncing: false })
+      const { dailyLog, currentDayNumber, currentWeekNumber, startDate } = get()
+      set({
+        error: (e as Error).message,
+        syncing: false,
+        todayRow: resolveTodayRow(dailyLog, currentDayNumber, currentWeekNumber, startDate),
+      })
     }
   },
 
   updateTodayField: (key, value) => {
-    const { todayRow } = get()
-    if (!todayRow) return
-    set({ todayRow: { ...todayRow, [key]: value } })
+    const { todayRow, currentDayNumber, currentWeekNumber, startDate } = get()
+    const baseRow = todayRow ?? createDefaultDailyRow(currentDayNumber, currentWeekNumber, startDate)
+    set({ todayRow: { ...baseRow, [key]: value } })
   },
 
   saveDay: async (updates) => {
-    const { accessToken, sheetId, todayRow, dailyLog } = get()
-    if (!accessToken || !sheetId || !todayRow) return
-    const updated = { ...todayRow, ...updates }
+    const { accessToken, sheetId, todayRow, dailyLog, currentDayNumber, currentWeekNumber, startDate } = get()
+    if (!accessToken || !sheetId) return
+    const baseRow = todayRow ?? createDefaultDailyRow(currentDayNumber, currentWeekNumber, startDate)
+    const updated = { ...baseRow, ...updates }
     set({ todayRow: updated, syncing: true })
     try {
       await writeDayLog(accessToken, sheetId, updated.day_number, dailyRowToArray(updated))
