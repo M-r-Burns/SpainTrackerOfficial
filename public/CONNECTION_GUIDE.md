@@ -44,6 +44,7 @@ Editor access is required for writing daily logs.
 For Cloudflare Pages, set these as environment variables/secrets in your Pages project:
 
 - `GOOGLE_CLIENT_ID` (or `VITE_GOOGLE_CLIENT_ID`)
+- `GOOGLE_CLIENT_SECRET`
 - `SHEET_ID` (or `VITE_SHEET_ID`)
 
 The app fetches these from `/api/config` at runtime on startup, so:

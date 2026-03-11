@@ -50,6 +50,7 @@ A Progressive Web App for tracking a 4-month immersive experience in Valencia, S
 Set these environment variables/secrets in your Pages project and redeploy:
 
 - `GOOGLE_CLIENT_ID` (or `VITE_GOOGLE_CLIENT_ID`)
+- `GOOGLE_CLIENT_SECRET`
 - `SHEET_ID` (or `VITE_SHEET_ID`)
 
 The app reads them at runtime via Pages Functions, auto-loads the sheet ID, and uses the
@@ -61,4 +62,5 @@ client ID for OAuth so users can sign in immediately from the login screen.
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID (build-time fallback) |
 | `VITE_SHEET_ID` | Google Sheets spreadsheet ID (build-time fallback) |
 | `GOOGLE_CLIENT_ID` | Cloudflare Pages runtime variable/secret for OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Cloudflare Pages secret used server-side for Google token exchange |
 | `SHEET_ID` | Cloudflare Pages runtime variable/secret for spreadsheet ID |

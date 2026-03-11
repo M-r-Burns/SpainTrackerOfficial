@@ -5,6 +5,72 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
+interface TokenRequest {
+  action: 'exchange' | 'refresh'
+  code?: string
+  refreshToken?: string
+  codeVerifier?: string
+}
+
+interface TokenResponse {
+  access_token?: string
+  refresh_token?: string
+  error?: string
+  error_description?: string
+}
+
+async function requestTokenDirect(payload: TokenRequest): Promise<TokenResponse> {
+  const { googleClientId } = await getRuntimeConfig()
+  if (!googleClientId) throw new Error('Missing Google Client ID configuration')
+
+  const body = new URLSearchParams({
+    client_id: googleClientId,
+    redirect_uri: REDIRECT_URI,
+  })
+
+  if (payload.action === 'exchange') {
+    if (!payload.code || !payload.codeVerifier) throw new Error('Missing authorization code parameters')
+    body.set('grant_type', 'authorization_code')
+    body.set('code', payload.code)
+    body.set('code_verifier', payload.codeVerifier)
+  } else {
+    if (!payload.refreshToken) throw new Error('Missing refresh token')
+    body.set('grant_type', 'refresh_token')
+    body.set('refresh_token', payload.refreshToken)
+  }
+
+  const res = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+
+  const data = (await res.json()) as TokenResponse
+  if (!res.ok) throw new Error(`Token exchange failed: ${JSON.stringify(data)}`)
+  return data
+}
+
+async function requestToken(payload: TokenRequest): Promise<TokenResponse> {
+  try {
+    const res = await fetch('/api/auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, redirectUri: REDIRECT_URI }),
+    })
+
+    const data = (await res.json()) as TokenResponse
+    if (res.ok) return data
+
+    if (res.status === 404 || res.status === 405) {
+      return requestTokenDirect(payload)
+    }
+
+    throw new Error(`Token exchange failed: ${JSON.stringify(data)}`)
+  } catch {
+    return requestTokenDirect(payload)
+  }
+}
+
 function base64URLEncode(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let str = ''
@@ -52,35 +118,18 @@ export async function startOAuthFlow(): Promise<void> {
 }
 
 export async function handleOAuthCallback(code: string, state: string): Promise<string> {
-  const { googleClientId } = await getRuntimeConfig()
-  if (!googleClientId) throw new Error('Missing Google Client ID configuration')
-
   const storedState = localStorage.getItem('pkce_state')
   const verifier = localStorage.getItem('pkce_verifier')
 
   if (state !== storedState) throw new Error('OAuth state mismatch')
   if (!verifier) throw new Error('No PKCE verifier found')
 
-  const body = new URLSearchParams({
-    client_id: googleClientId,
-    redirect_uri: REDIRECT_URI,
-    grant_type: 'authorization_code',
+  const data = await requestToken({
+    action: 'exchange',
     code,
-    code_verifier: verifier,
+    codeVerifier: verifier,
   })
 
-  const res = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Token exchange failed: ${err}`)
-  }
-
-  const data = await res.json()
   localStorage.removeItem('pkce_verifier')
   localStorage.removeItem('pkce_state')
 
@@ -92,27 +141,15 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
 }
 
 export async function refreshAccessToken(): Promise<string | null> {
-  const { googleClientId } = await getRuntimeConfig()
-  if (!googleClientId) return null
-
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) return null
 
-  const body = new URLSearchParams({
-    client_id: googleClientId,
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-  })
-
   try {
-    const res = await fetch(TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
+    const data = await requestToken({
+      action: 'refresh',
+      refreshToken,
     })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.access_token as string
+    return (data.access_token as string) || null
   } catch {
     return null
   }
