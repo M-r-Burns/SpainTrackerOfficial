@@ -34,6 +34,62 @@ function NumberInput({ value, onChange, label, unit, min = 0, step = 1 }: {
         <button onClick={() => onChange(value + step)}
           className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center">+</button>
       </div>
+      <div className="mt-3">
+        <input
+          type="number"
+          min={min}
+          step={step < 1 ? 0.1 : 1}
+          value={value}
+          onChange={(e) => {
+            const next = Number(e.target.value)
+            if (!Number.isFinite(next)) return
+            onChange(Math.max(min, next))
+          }}
+          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"
+        />
+      </div>
+    </div>
+  )
+}
+
+function PodcastMinutesInput({ minutes, onChangeMinutes }: { minutes: number; onChangeMinutes: (v: number) => void }) {
+  return (
+    <div className="bg-[#16213E]/70 rounded-xl p-4 border border-[#16213E]">
+      <div className="text-xs text-[#B0BEC5] mb-2">Podcast Listening</div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => onChangeMinutes(Math.max(0, minutes - 10))}
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center"
+        >
+          −
+        </button>
+        <span className="font-mono text-2xl font-bold text-white flex-1 text-center">
+          {minutes}
+          <span className="text-sm text-[#B0BEC5] ml-1">min</span>
+        </span>
+        <button
+          onClick={() => onChangeMinutes(minutes + 10)}
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center"
+        >
+          +
+        </button>
+      </div>
+      <div className="mt-3">
+        <input
+          type="number"
+          min={0}
+          step={10}
+          inputMode="numeric"
+          value={minutes}
+          onChange={(e) => {
+            const next = Number(e.target.value)
+            if (!Number.isFinite(next)) return
+            onChangeMinutes(Math.max(0, Math.round(next)))
+          }}
+          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"
+        />
+        <p className="text-[11px] text-[#B0BEC5] mt-1">Quick buttons change by 10 minutes.</p>
+      </div>
     </div>
   )
 }
@@ -71,6 +127,7 @@ export default function TodayView() {
   }
 
   const activeRow = todayRow ?? fallbackRow
+  const podcastMinutes = Math.round(activeRow.podcast_done * 60)
 
   const classLabel = activeRow.is_morning_class ? '🌅 Morning Class' : activeRow.is_class_day ? '🌆 Afternoon Class' : '🏠 No Class Today'
 
@@ -138,7 +195,10 @@ export default function TodayView() {
         <NumberInput value={activeRow.app_hours} onChange={v => updateField('app_hours', v)} label="App Dev Hours" unit="h" step={0.5} />
         <NumberInput value={activeRow.job_apps_sent} onChange={v => updateField('job_apps_sent', v)} label="Job Applications Sent" />
         <NumberInput value={activeRow.conversations_count} onChange={v => updateField('conversations_count', v)} label="Spanish Conversations" />
-        <NumberInput value={activeRow.podcast_done} onChange={v => updateField('podcast_done', v)} label="Podcast Hours" unit="h" step={0.5} />
+        <PodcastMinutesInput
+          minutes={podcastMinutes}
+          onChangeMinutes={(minutes) => updateField('podcast_done', Number((minutes / 60).toFixed(2)))}
+        />
       </div>
 
       <div className="bg-[#1A1A2E]/95 backdrop-blur border border-[#16213E] rounded-2xl p-4 mb-6 shadow-xl">
