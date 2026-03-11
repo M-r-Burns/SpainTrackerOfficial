@@ -49,4 +49,4 @@ Deploy to Vercel — \`vercel.json\` is pre-configured for SPA routing.
 | Variable | Description |
 |----------|-------------|
 | \`VITE_GOOGLE_CLIENT_ID\` | Google OAuth 2.0 Client ID |
-| \`VITE_SHEET_ID\` | Google Sheets spreadsheet ID |
+| `VITE_SHEET_ID` | Google Sheets spreadsheet ID (optional when provided as a Cloudflare Pages secret; app will read this automatically and disable the settings field) |

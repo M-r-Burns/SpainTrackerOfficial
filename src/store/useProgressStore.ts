@@ -61,7 +61,8 @@ function dailyRowToArray(row: DailyLogRow): (string | number | boolean)[] {
 export const useProgressStore = create<ProgressStore>((set, get) => ({
   isAuthenticated: false,
   accessToken: null,
-  sheetId: import.meta.env.VITE_SHEET_ID ?? '',
+  // prefer the build-time environment variable; fall back to whatever the user previously entered
+  sheetId: import.meta.env.VITE_SHEET_ID || localStorage.getItem('sheet_id') || '',
   startDate: '',
   configRows: [],
   dailyLog: [],
@@ -78,6 +79,11 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
   setAuth: (token) => set({ isAuthenticated: true, accessToken: token }),
 
   setSheetId: (id) => {
+    // if a sheet ID was baked into the build via env, ignore attempts to change it
+    if (import.meta.env.VITE_SHEET_ID) {
+      console.warn('Sheet ID is supplied via environment and cannot be changed at runtime.')
+      return
+    }
     set({ sheetId: id })
     localStorage.setItem('sheet_id', id)
   },

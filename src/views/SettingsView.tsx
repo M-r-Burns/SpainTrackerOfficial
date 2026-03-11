@@ -6,6 +6,7 @@ import { startOAuthFlow, logout } from '../auth/googleAuth'
 
 export default function SettingsView() {
   const { isAuthenticated, sheetId, setSheetId, syncData, syncing, lastSynced, error } = useProgressStore()
+  const envSheetId = import.meta.env.VITE_SHEET_ID || ''
   const [localSheetId, setLocalSheetId] = useState(sheetId)
 
   function handleLogout() {
@@ -44,19 +45,27 @@ export default function SettingsView() {
 
       <div className="bg-[#1A1A2E] rounded-2xl p-4 mb-4">
         <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider mb-3">Google Sheet</h2>
-        <div className="flex gap-2">
-          <input
-            value={localSheetId}
-            onChange={e => setLocalSheetId(e.target.value)}
-            placeholder="Paste your Sheet ID here"
-            className="flex-1 bg-[#16213E] rounded-xl px-3 py-2 text-sm text-white placeholder-[#B0BEC5]/50 outline-none focus:ring-2 focus:ring-[#E94560]/50"
-          />
-          <button onClick={handleSaveSheetId}
-            className="bg-[#E94560] text-white px-3 py-2 rounded-xl text-sm font-semibold">
-            Save
-          </button>
-        </div>
-        <p className="text-xs text-[#B0BEC5] mt-2">Found in the URL: docs.google.com/spreadsheets/d/<strong className="text-white">SHEET_ID</strong>/edit</p>
+        {envSheetId ? (
+          <p className="text-sm text-[#B0BEC5]">
+            Using sheet ID supplied via environment. You do not need to enter anything here.
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <input
+                value={localSheetId}
+                onChange={e => setLocalSheetId(e.target.value)}
+                placeholder="Paste your Sheet ID here"
+                className="flex-1 bg-[#16213E] rounded-xl px-3 py-2 text-sm text-white placeholder-[#B0BEC5]/50 outline-none focus:ring-2 focus:ring-[#E94560]/50"
+              />
+              <button onClick={handleSaveSheetId}
+                className="bg-[#E94560] text-white px-3 py-2 rounded-xl text-sm font-semibold">
+                Save
+              </button>
+            </div>
+            <p className="text-xs text-[#B0BEC5] mt-2">Found in the URL: docs.google.com/spreadsheets/d/<strong className="text-white">SHEET_ID</strong>/edit</p>
+          </>
+        )}
       </div>
 
       <div className="bg-[#1A1A2E] rounded-2xl p-4 mb-4">

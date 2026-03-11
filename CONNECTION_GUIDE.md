@@ -33,8 +33,13 @@ Editor access is required for writing daily logs.
 ## 4. First Launch
 
 1. Open the app and go to **Settings**
-2. Enter your Sheet ID and tap Save
+2. (Only if you didn't provide it via environment) Enter your Sheet ID and tap Save
+   - When deploying to Cloudflare Pages you can set `VITE_SHEET_ID` as a secret environment
+     variable. The app will automatically read it at build time and the input field will be
+     disabled.
 3. Tap **Sign in with Google**
+   - Likewise the Google client ID is read from `VITE_GOOGLE_CLIENT_ID`; set it as a Pages
+     environment variable/secret in production.
 4. Grant access to Google Sheets
 5. Return to **Today** view — data should load automatically
 

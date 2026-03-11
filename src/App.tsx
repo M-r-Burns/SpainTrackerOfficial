@@ -13,8 +13,12 @@ export default function App() {
   const { setAuth, syncData, setSheetId } = useProgressStore()
 
   useEffect(() => {
-    const savedSheetId = localStorage.getItem('sheet_id')
-    if (savedSheetId) setSheetId(savedSheetId)
+    // if the sheet id was injected at build time we don't need to look at storage
+    const envSheetId = import.meta.env.VITE_SHEET_ID || ''
+    if (!envSheetId) {
+      const savedSheetId = localStorage.getItem('sheet_id')
+      if (savedSheetId) setSheetId(savedSheetId)
+    }
 
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
