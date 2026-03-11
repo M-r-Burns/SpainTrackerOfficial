@@ -32,11 +32,26 @@ Editor access is required for writing daily logs.
 
 ## 4. First Launch
 
-1. Open the app and go to **Settings**
-2. Enter your Sheet ID and tap Save
+1. Open the app
+2. If you are not logged in, the app now shows a dedicated **Sign in with Google** screen first
+   (no need to open Settings just to authenticate).
 3. Tap **Sign in with Google**
 4. Grant access to Google Sheets
 5. Return to **Today** view — data should load automatically
+
+## 5. Cloudflare Pages variables (recommended)
+
+For Cloudflare Pages, set these as environment variables/secrets in your Pages project:
+
+- `GOOGLE_CLIENT_ID` (or `VITE_GOOGLE_CLIENT_ID`)
+- `SHEET_ID` (or `VITE_SHEET_ID`)
+
+The app fetches these from `/api/config` at runtime on startup, so:
+
+- Google OAuth always gets `client_id`
+- The sheet ID is auto-applied (no manual entry required)
+
+After editing Pages variables, redeploy your site.
 
 ## Troubleshooting
 

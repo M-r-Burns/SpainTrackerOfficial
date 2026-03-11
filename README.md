@@ -43,10 +43,22 @@ A Progressive Web App for tracking a 4-month immersive experience in Valencia, S
    \`\`\`
 
 ## Deployment
-Deploy to Vercel — \`vercel.json\` is pre-configured for SPA routing.
+- Vercel: `vercel.json` is pre-configured for SPA routing.
+- Cloudflare Pages: supported with runtime config endpoint at `/api/config`.
+
+### Cloudflare Pages setup
+Set these environment variables/secrets in your Pages project and redeploy:
+
+- `GOOGLE_CLIENT_ID` (or `VITE_GOOGLE_CLIENT_ID`)
+- `SHEET_ID` (or `VITE_SHEET_ID`)
+
+The app reads them at runtime via Pages Functions, auto-loads the sheet ID, and uses the
+client ID for OAuth so users can sign in immediately from the login screen.
 
 ## Environment Variables
 | Variable | Description |
 |----------|-------------|
-| \`VITE_GOOGLE_CLIENT_ID\` | Google OAuth 2.0 Client ID |
-| `VITE_SHEET_ID` | Google Sheets spreadsheet ID (optional when provided as a Cloudflare Pages secret; app will read this automatically and disable the settings field) |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID (build-time fallback) |
+| `VITE_SHEET_ID` | Google Sheets spreadsheet ID (build-time fallback) |
+| `GOOGLE_CLIENT_ID` | Cloudflare Pages runtime variable/secret for OAuth client ID |
+| `SHEET_ID` | Cloudflare Pages runtime variable/secret for spreadsheet ID |

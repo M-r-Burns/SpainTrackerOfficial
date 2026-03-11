@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { LogIn } from 'lucide-react'
 import Layout from './components/Layout'
 import TodayView from './views/TodayView'
 import WeekView from './views/WeekView'
@@ -7,41 +8,103 @@ import OverallView from './views/OverallView'
 import HistoryView from './views/HistoryView'
 import SettingsView from './views/SettingsView'
 import { useProgressStore } from './store/useProgressStore'
-import { handleOAuthCallback, refreshAccessToken } from './auth/googleAuth'
+import { handleOAuthCallback, refreshAccessToken, startOAuthFlow } from './auth/googleAuth'
+import { getRuntimeConfig } from './config/runtimeConfig'
+
+function LoginScreen({ error }: { error: string | null }) {
+  const [signingIn, setSigningIn] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
+
+  async function handleLogin() {
+    setSigningIn(true)
+    setLoginError(null)
+    try {
+      await startOAuthFlow()
+    } catch (e) {
+      setLoginError((e as Error).message)
+      setSigningIn(false)
+    }
+  }
+
+  return (
+    <div className="min-h-dvh bg-[#0D0D1A] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-[#1A1A2E] rounded-2xl p-5">
+        <h1 className="text-2xl font-bold text-white mb-2">Valencia Tracker</h1>
+        <p className="text-sm text-[#B0BEC5] mb-5">Sign in to load your Google Sheets data.</p>
+        <button
+          onClick={handleLogin}
+          disabled={signingIn}
+          className="w-full flex items-center justify-center gap-2 bg-[#E94560] text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-70"
+        >
+          <LogIn size={16} />
+          {signingIn ? 'Redirecting…' : 'Sign in with Google'}
+        </button>
+        {(loginError || error) && <p className="text-xs text-[#F44336] mt-3">{loginError || error}</p>}
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
-  const { setAuth, syncData, setSheetId } = useProgressStore()
+  const { isAuthenticated, setAuth, syncData, setSheetId } = useProgressStore()
+  const [authBootstrapping, setAuthBootstrapping] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    // if the sheet id was injected at build time we don't need to look at storage
-    const envSheetId = import.meta.env.VITE_SHEET_ID || ''
-    if (!envSheetId) {
-      const savedSheetId = localStorage.getItem('sheet_id')
-      if (savedSheetId) setSheetId(savedSheetId)
-    }
+    let active = true
 
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const state = params.get('state')
+    const bootstrap = async () => {
+      try {
+        const runtimeConfig = await getRuntimeConfig()
+        if (runtimeConfig.sheetId) {
+          setSheetId(runtimeConfig.sheetId)
+        } else {
+          const savedSheetId = localStorage.getItem('sheet_id')
+          if (savedSheetId) setSheetId(savedSheetId)
+        }
 
-    if (code && state) {
-      handleOAuthCallback(code, state)
-        .then(token => {
+        const params = new URLSearchParams(window.location.search)
+        const code = params.get('code')
+        const state = params.get('state')
+
+        if (code && state) {
+          const token = await handleOAuthCallback(code, state)
           setAuth(token)
           window.history.replaceState({}, '', '/')
-          syncData()
-        })
-        .catch(console.error)
-      return
+          await syncData()
+          return
+        }
+
+        const token = await refreshAccessToken()
+        if (token) {
+          setAuth(token)
+          await syncData()
+        }
+      } catch (e) {
+        if (active) setAuthError((e as Error).message)
+      } finally {
+        if (active) setAuthBootstrapping(false)
+      }
     }
 
-    refreshAccessToken().then(token => {
-      if (token) {
-        setAuth(token)
-        syncData()
-      }
-    })
+    bootstrap()
+
+    return () => {
+      active = false
+    }
   }, [])
+
+  if (authBootstrapping) {
+    return (
+      <div className="min-h-dvh bg-[#0D0D1A] flex items-center justify-center">
+        <p className="text-sm text-[#B0BEC5]">Loading…</p>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen error={authError} />
+  }
 
   return (
     <BrowserRouter>

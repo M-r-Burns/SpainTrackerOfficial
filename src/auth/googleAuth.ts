@@ -1,4 +1,5 @@
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+import { getRuntimeConfig } from '../config/runtimeConfig'
+
 const REDIRECT_URI = `${window.location.origin}/`
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -25,6 +26,9 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 export async function startOAuthFlow(): Promise<void> {
+  const { googleClientId } = await getRuntimeConfig()
+  if (!googleClientId) throw new Error('Missing Google Client ID configuration')
+
   const verifier = await generateCodeVerifier()
   const challenge = await generateCodeChallenge(verifier)
   const state = base64URLEncode(crypto.getRandomValues(new Uint8Array(16)).buffer)
@@ -33,7 +37,7 @@ export async function startOAuthFlow(): Promise<void> {
   localStorage.setItem('pkce_state', state)
 
   const params = new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: googleClientId,
     redirect_uri: REDIRECT_URI,
     response_type: 'code',
     scope: SCOPES,
@@ -48,6 +52,9 @@ export async function startOAuthFlow(): Promise<void> {
 }
 
 export async function handleOAuthCallback(code: string, state: string): Promise<string> {
+  const { googleClientId } = await getRuntimeConfig()
+  if (!googleClientId) throw new Error('Missing Google Client ID configuration')
+
   const storedState = localStorage.getItem('pkce_state')
   const verifier = localStorage.getItem('pkce_verifier')
 
@@ -55,7 +62,7 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   if (!verifier) throw new Error('No PKCE verifier found')
 
   const body = new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: googleClientId,
     redirect_uri: REDIRECT_URI,
     grant_type: 'authorization_code',
     code,
@@ -85,11 +92,14 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
 }
 
 export async function refreshAccessToken(): Promise<string | null> {
+  const { googleClientId } = await getRuntimeConfig()
+  if (!googleClientId) return null
+
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) return null
 
   const body = new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: googleClientId,
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
   })
