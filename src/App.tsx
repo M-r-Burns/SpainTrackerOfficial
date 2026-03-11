@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import Layout from './components/Layout'
 import TodayView from './views/TodayView'
@@ -28,9 +28,10 @@ function LoginScreen({ error }: { error: string | null }) {
 
   return (
     <div className="min-h-dvh bg-[#0D0D1A] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#1A1A2E] rounded-2xl p-5">
-        <h1 className="text-2xl font-bold text-white mb-2">Valencia Tracker</h1>
-        <p className="text-sm text-[#B0BEC5] mb-5">Sign in to load your Google Sheets data.</p>
+      <div className="w-full max-w-sm bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-5 shadow-2xl">
+        <p className="text-xs text-[#E94560] font-semibold uppercase tracking-wider mb-2">Spain Tracker</p>
+        <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
+        <p className="text-sm text-[#B0BEC5] mb-5">Sign in to open your Home dashboard and update your daily progress.</p>
         <button
           onClick={handleLogin}
           disabled={signingIn}
@@ -111,10 +112,12 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<TodayView />} />
+          <Route path="home" element={<Navigate to="/" replace />} />
           <Route path="week" element={<WeekView />} />
           <Route path="overall" element={<OverallView />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="settings" element={<SettingsView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

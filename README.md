@@ -3,7 +3,8 @@
 A Progressive Web App for tracking a 4-month immersive experience in Valencia, Spain.
 
 ## Features
-- 📅 Daily log with checklist and number inputs
+- 🏠 Home dashboard opens after login with editable daily tracking
+- 📅 Daily log with checklist, notes, and number inputs that save to Google Sheets
 - 📊 Weekly progress vs targets
 - 🌍 Overall 16-week journey view
 - 📆 Streak heatmap calendar

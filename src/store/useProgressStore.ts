@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AppState, ConfigRow, DailyLogRow } from '../types'
-import { fetchConfig, fetchDailyLog, writeDayLog } from '../api/sheets'
+import { fetchConfig, fetchDailyLog, getStartDate, writeDayLog } from '../api/sheets'
 import { computeStreakForField } from '../utils/calculations'
 
 interface ProgressStore extends AppState {
@@ -32,6 +32,54 @@ function getCurrentDayInfo(log: DailyLogRow[], startDate: string): { dayNumber: 
     return { dayNumber: Math.max(1, Math.min(112, dayNumber)), weekNumber: Math.max(1, Math.min(16, weekNumber)) }
   }
   return { dayNumber: 1, weekNumber: 1 }
+}
+
+function getTodayIsoDate(): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today.toISOString().split('T')[0]
+}
+
+function getIsoDateFromStartDate(startDate: string, dayNumber: number): string {
+  if (!startDate) return getTodayIsoDate()
+  const start = new Date(startDate)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() + (dayNumber - 1))
+  return start.toISOString().split('T')[0]
+}
+
+function getDayOfWeek(dateIso: string): string {
+  return new Date(dateIso).toLocaleDateString('en-US', { weekday: 'long' })
+}
+
+function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate: string): DailyLogRow {
+  const date = getIsoDateFromStartDate(startDate, dayNumber)
+  const weekday = getDayOfWeek(date)
+  const weekdayIndex = new Date(date).getDay()
+  const isClassDay = weekdayIndex >= 1 && weekdayIndex <= 5
+  const isMorningClass = weekdayIndex === 1 || weekdayIndex === 3 || weekdayIndex === 5
+
+  return {
+    day_number: dayNumber,
+    week_number: weekNumber,
+    date,
+    day_of_week: weekday,
+    is_class_day: isClassDay,
+    is_morning_class: isMorningClass,
+    book_chapter_completed: false,
+    podcast_done: 0,
+    flashcard_done: false,
+    class_attended: false,
+    conversations_count: 0,
+    duolingo_test_score: null,
+    walk_used_for_listening: false,
+    app_hours: 0,
+    job_apps_sent: 0,
+    gym_done: false,
+    life_event: '',
+    energy_level: null,
+    notes: '',
+  }
 }
 
 function dailyRowToArray(row: DailyLogRow): (string | number | boolean)[] {
@@ -95,16 +143,22 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     if (!accessToken || !sheetId) return
     set({ syncing: true, error: null })
     try {
-      const [config, log] = await Promise.all([
+      const [config, log, fetchedStartDate] = await Promise.all([
         fetchConfig(accessToken, sheetId),
         fetchDailyLog(accessToken, sheetId),
+        getStartDate(accessToken, sheetId),
       ])
-      const { dayNumber, weekNumber } = getCurrentDayInfo(log, get().startDate)
-      const today = new Date().toISOString().split('T')[0]
-      const todayRow = log.find(r => r.date === today) ?? null
+      const activeStartDate = fetchedStartDate || get().startDate
+      const { dayNumber, weekNumber } = getCurrentDayInfo(log, activeStartDate)
+      const today = getTodayIsoDate()
+      const todayRow =
+        log.find(r => r.date === today) ??
+        log.find(r => r.day_number === dayNumber) ??
+        createDefaultDailyRow(dayNumber, weekNumber, activeStartDate)
       const flashcardStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'flashcard_done')
       const gymStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'gym_done')
       set({
+        startDate: activeStartDate,
         configRows: config,
         dailyLog: log,
         todayRow,
@@ -133,7 +187,10 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     set({ todayRow: updated, syncing: true })
     try {
       await writeDayLog(accessToken, sheetId, updated.day_number, dailyRowToArray(updated))
-      const newLog = dailyLog.map(r => r.day_number === updated.day_number ? updated : r)
+      const hasExistingDay = dailyLog.some(r => r.day_number === updated.day_number)
+      const newLog = hasExistingDay
+        ? dailyLog.map(r => r.day_number === updated.day_number ? updated : r)
+        : [...dailyLog, updated].sort((a, b) => a.day_number - b.day_number)
       const flashcardStreak = computeStreakForField(newLog.filter(r => r.date && new Date(r.date) <= new Date()), 'flashcard_done')
       const gymStreak = computeStreakForField(newLog.filter(r => r.date && new Date(r.date) <= new Date()), 'gym_done')
       set({ dailyLog: newLog, flashcardStreak, gymStreak, syncing: false, lastSynced: new Date() })
