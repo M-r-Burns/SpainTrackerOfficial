@@ -8,7 +8,7 @@ import OverallView from './views/OverallView'
 import HistoryView from './views/HistoryView'
 import SettingsView from './views/SettingsView'
 import { useProgressStore } from './store/useProgressStore'
-import { handleOAuthCallback, refreshAccessToken, startOAuthFlow } from './auth/googleAuth'
+import { handleOAuthCallback, refreshAccessToken, startOAuthFlow, startSilentOAuthFlow } from './auth/googleAuth'
 import { getRuntimeConfig } from './config/runtimeConfig'
 
 function LoginScreen({ error }: { error: string | null }) {
@@ -29,13 +29,13 @@ function LoginScreen({ error }: { error: string | null }) {
   return (
     <div className="min-h-dvh bg-[#0D0D1A] flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-[#1A1A2E] border border-[#16213E] rounded-2xl p-5 shadow-2xl">
-        <p className="text-xs text-[#E94560] font-semibold uppercase tracking-wider mb-2">Spain Tracker</p>
+        <p className="text-xs text-[#4FC3F7] font-semibold uppercase tracking-wider mb-2">Spain Tracker</p>
         <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
         <p className="text-sm text-[#B0BEC5] mb-5">Sign in to open your Home dashboard and update your daily progress.</p>
         <button
           onClick={handleLogin}
           disabled={signingIn}
-          className="w-full flex items-center justify-center gap-2 bg-[#E94560] text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-70"
+          className="w-full flex items-center justify-center gap-2 bg-[#4FC3F7] text-[#0F2027] py-3 rounded-xl text-sm font-semibold disabled:opacity-70"
         >
           <LogIn size={16} />
           {signingIn ? 'Redirecting…' : 'Sign in with Google'}
@@ -50,6 +50,12 @@ export default function App() {
   const { isAuthenticated, setAuth, syncData, setSheetId } = useProgressStore()
   const [authBootstrapping, setAuthBootstrapping] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
+
+  const shouldTrySilentReauth = () => {
+    const everAuthenticated = localStorage.getItem('ever_authenticated') === '1'
+    const triedThisSession = sessionStorage.getItem('silent_oauth_attempted') === '1'
+    return everAuthenticated && !triedThisSession
+  }
 
   useEffect(() => {
     let active = true
@@ -67,6 +73,14 @@ export default function App() {
         const params = new URLSearchParams(window.location.search)
         const code = params.get('code')
         const state = params.get('state')
+        const oauthError = params.get('error')
+
+        if (oauthError) {
+          window.history.replaceState({}, '', '/')
+          if (oauthError !== 'login_required' && active) {
+            setAuthError(oauthError)
+          }
+        }
 
         if (code && state) {
           const token = await handleOAuthCallback(code, state)
@@ -80,6 +94,12 @@ export default function App() {
         if (token) {
           setAuth(token)
           await syncData()
+          return
+        }
+
+        if (shouldTrySilentReauth()) {
+          sessionStorage.setItem('silent_oauth_attempted', '1')
+          await startSilentOAuthFlow()
         }
       } catch (e) {
         if (active) setAuthError((e as Error).message)
@@ -94,6 +114,22 @@ export default function App() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return
+      const token = await refreshAccessToken()
+      if (token) {
+        setAuth(token)
+        await syncData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [isAuthenticated, setAuth, syncData])
 
   if (authBootstrapping) {
     return (

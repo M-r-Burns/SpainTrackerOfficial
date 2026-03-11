@@ -21,7 +21,7 @@ export default function BottomNav() {
             end={to === '/'}
             className={({ isActive }) =>
               `flex-1 flex flex-col items-center gap-1 py-3.5 text-xs transition-colors ${
-                isActive ? 'text-[#E94560]' : 'text-[#B0BEC5] hover:text-white'
+                isActive ? 'text-[#4FC3F7]' : 'text-[#B0BEC5] hover:text-white'
               }`
             }
           >

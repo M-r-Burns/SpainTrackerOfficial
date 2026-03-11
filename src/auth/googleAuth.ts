@@ -19,6 +19,11 @@ interface TokenResponse {
   error_description?: string
 }
 
+interface OAuthFlowOptions {
+  prompt?: 'consent' | 'none'
+  accessType?: 'offline' | 'online'
+}
+
 async function requestTokenDirect(payload: TokenRequest): Promise<TokenResponse> {
   const { googleClientId } = await getRuntimeConfig()
   if (!googleClientId) throw new Error('Missing Google Client ID configuration')
@@ -97,7 +102,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
   return base64URLEncode(digest)
 }
 
-export async function startOAuthFlow(): Promise<void> {
+export async function startOAuthFlow(options?: OAuthFlowOptions): Promise<void> {
   const { googleClientId } = await getRuntimeConfig()
   if (!googleClientId) throw new Error('Missing Google Client ID configuration')
 
@@ -116,11 +121,15 @@ export async function startOAuthFlow(): Promise<void> {
     code_challenge: challenge,
     code_challenge_method: 'S256',
     state,
-    access_type: 'offline',
-    prompt: 'consent',
+    access_type: options?.accessType ?? 'offline',
+    prompt: options?.prompt ?? 'consent',
   })
 
   window.location.href = `${AUTH_ENDPOINT}?${params}`
+}
+
+export async function startSilentOAuthFlow(): Promise<void> {
+  return startOAuthFlow({ prompt: 'none', accessType: 'online' })
 }
 
 export async function handleOAuthCallback(code: string, state: string): Promise<string> {
@@ -142,6 +151,7 @@ export async function handleOAuthCallback(code: string, state: string): Promise<
   if (data.refresh_token) {
     localStorage.setItem('refresh_token', data.refresh_token)
   }
+  localStorage.setItem('ever_authenticated', '1')
 
   return data.access_token as string
 }
@@ -155,6 +165,7 @@ export async function refreshAccessToken(): Promise<string | null> {
       action: 'refresh',
       refreshToken,
     })
+    localStorage.setItem('ever_authenticated', '1')
     return (data.access_token as string) || null
   } catch {
     return null

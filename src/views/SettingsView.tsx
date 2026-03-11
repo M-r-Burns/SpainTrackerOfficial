@@ -36,7 +36,7 @@ export default function SettingsView() {
             <LogOut size={16} /> Sign Out
           </button>
         ) : (
-          <button onClick={startOAuthFlow}
+          <button onClick={() => { void startOAuthFlow() }}
             className="w-full flex items-center justify-center gap-2 bg-[#E94560] text-white py-3 rounded-xl text-sm font-semibold">
             <LogIn size={16} /> Sign in with Google
           </button>

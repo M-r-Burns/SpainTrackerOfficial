@@ -10,11 +10,11 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
     <button
       onClick={() => onChange(!checked)}
       className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
-        checked ? 'bg-[#E94560]/10 border-[#E94560]/50 text-white' : 'bg-[#16213E]/70 border-[#16213E] text-[#B0BEC5]'
+        checked ? 'bg-[#4FC3F7]/12 border-[#4FC3F7]/50 text-white' : 'bg-[#16213E]/70 border-[#16213E] text-[#B0BEC5]'
       }`}
     >
       <span className="text-sm font-medium">{label}</span>
-      <div className={`w-10 h-6 rounded-full transition-colors relative ${checked ? 'bg-[#E94560]' : 'bg-[#0D0D1A]/90'}`}>
+      <div className={`w-10 h-6 rounded-full transition-colors relative ${checked ? 'bg-[#4FC3F7]' : 'bg-[#0D0D1A]/90'}`}>
         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${checked ? 'left-5' : 'left-1'}`} />
       </div>
     </button>
@@ -29,10 +29,10 @@ function NumberInput({ value, onChange, label, unit, min = 0, step = 1 }: {
       <div className="text-xs text-[#B0BEC5] mb-2">{label}</div>
       <div className="flex items-center gap-3">
         <button onClick={() => onChange(Math.max(min, value - step))}
-          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center">−</button>
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#4FC3F7] text-xl font-bold flex items-center justify-center">−</button>
         <span className="font-mono text-2xl font-bold text-white flex-1 text-center">{value}{unit && <span className="text-sm text-[#B0BEC5] ml-1">{unit}</span>}</span>
         <button onClick={() => onChange(value + step)}
-          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center">+</button>
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#4FC3F7] text-xl font-bold flex items-center justify-center">+</button>
       </div>
       <div className="mt-3">
         <input
@@ -45,7 +45,7 @@ function NumberInput({ value, onChange, label, unit, min = 0, step = 1 }: {
             if (!Number.isFinite(next)) return
             onChange(Math.max(min, next))
           }}
-          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"
+          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#4FC3F7]/50"
         />
       </div>
     </div>
@@ -59,7 +59,7 @@ function PodcastMinutesInput({ minutes, onChangeMinutes }: { minutes: number; on
       <div className="flex items-center gap-3">
         <button
           onClick={() => onChangeMinutes(Math.max(0, minutes - 10))}
-          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center"
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#4FC3F7] text-xl font-bold flex items-center justify-center"
         >
           −
         </button>
@@ -69,7 +69,7 @@ function PodcastMinutesInput({ minutes, onChangeMinutes }: { minutes: number; on
         </span>
         <button
           onClick={() => onChangeMinutes(minutes + 10)}
-          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#E94560] text-xl font-bold flex items-center justify-center"
+          className="w-8 h-8 rounded-lg bg-[#1A1A2E] text-[#4FC3F7] text-xl font-bold flex items-center justify-center"
         >
           +
         </button>
@@ -86,7 +86,7 @@ function PodcastMinutesInput({ minutes, onChangeMinutes }: { minutes: number; on
             if (!Number.isFinite(next)) return
             onChangeMinutes(Math.max(0, Math.round(next)))
           }}
-          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"
+          className="w-full bg-[#1A1A2E] border border-[#0D0D1A] rounded-xl px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-[#4FC3F7]/50"
         />
         <p className="text-[11px] text-[#B0BEC5] mt-1">Quick buttons change by 10 minutes.</p>
       </div>
@@ -156,8 +156,8 @@ export default function TodayView() {
 
   return (
     <motion.div className="p-4 relative overflow-hidden" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="pointer-events-none absolute -top-16 -right-12 h-44 w-44 bg-[#E94560]/20 blur-3xl rounded-full" />
-      <div className="pointer-events-none absolute top-40 -left-10 h-36 w-36 bg-[#1565C0]/20 blur-3xl rounded-full" />
+      <div className="pointer-events-none absolute -top-16 -right-12 h-44 w-44 bg-[#4FC3F7]/20 blur-3xl rounded-full" />
+      <div className="pointer-events-none absolute top-40 -left-10 h-36 w-36 bg-[#E0E0E0]/12 blur-3xl rounded-full" />
 
       <div className="mb-6 bg-gradient-to-br from-[#1A1A2E] to-[#16213E] border border-[#16213E] rounded-3xl p-5 shadow-2xl">
         <div className="flex items-center justify-between mb-2">
@@ -169,7 +169,7 @@ export default function TodayView() {
         <h1 className="text-3xl font-bold text-white tracking-tight">Home Dashboard</h1>
         <p className="text-sm text-[#B0BEC5] mt-1">Day {currentDayNumber} of 112 — Week {currentWeekNumber}</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {weekConfig && <span className="inline-block text-xs bg-[#E94560]/15 border border-[#E94560]/30 px-3 py-1 rounded-full text-[#E94560]">{weekConfig.phase}</span>}
+          {weekConfig && <span className="inline-block text-xs bg-[#4FC3F7]/15 border border-[#4FC3F7]/35 px-3 py-1 rounded-full text-[#4FC3F7]">{weekConfig.phase}</span>}
           <span className="inline-block text-xs bg-[#16213E] px-3 py-1 rounded-full text-[#B0BEC5]">{classLabel}</span>
         </div>
       </div>
@@ -207,14 +207,14 @@ export default function TodayView() {
           value={activeRow.life_event}
           onChange={e => updateField('life_event', e.target.value)}
           placeholder="Life event (optional)"
-          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm mb-3 outline-none focus:ring-2 focus:ring-[#E94560]/50"
+          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm mb-3 outline-none focus:ring-2 focus:ring-[#4FC3F7]/50"
         />
         <textarea
           value={activeRow.notes}
           onChange={e => updateField('notes', e.target.value)}
           placeholder="How was your day?"
           rows={3}
-          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl p-4 text-white placeholder-[#B0BEC5]/50 text-sm resize-none outline-none focus:ring-2 focus:ring-[#E94560]/50"
+          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl p-4 text-white placeholder-[#B0BEC5]/50 text-sm resize-none outline-none focus:ring-2 focus:ring-[#4FC3F7]/50"
         />
       </div>
 
@@ -223,7 +223,7 @@ export default function TodayView() {
         <div className="flex gap-2 mb-3">
           {[1, 2, 3, 4, 5].map(n => (
             <button key={n} onClick={() => updateField('energy_level', n)}
-              className={`flex-1 h-10 rounded-xl text-sm font-mono font-bold transition-all ${activeRow.energy_level === n ? 'bg-[#E94560] text-white' : 'bg-[#16213E] text-[#B0BEC5]'}`}>
+              className={`flex-1 h-10 rounded-xl text-sm font-mono font-bold transition-all ${activeRow.energy_level === n ? 'bg-[#4FC3F7] text-[#0F2027]' : 'bg-[#16213E] text-[#B0BEC5]'}`}>
               {n}
             </button>
           ))}
@@ -236,14 +236,14 @@ export default function TodayView() {
           value={activeRow.duolingo_test_score ?? ''}
           onChange={(e) => updateField('duolingo_test_score', e.target.value === '' ? null : Number(e.target.value))}
           placeholder="e.g. 110"
-          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm outline-none focus:ring-2 focus:ring-[#E94560]/50"
+          className="w-full bg-[#16213E]/70 border border-[#16213E] rounded-xl px-3 py-2 text-white placeholder-[#B0BEC5]/50 text-sm outline-none focus:ring-2 focus:ring-[#4FC3F7]/50"
         />
       </div>
 
       <motion.button
         onClick={handleSave}
         disabled={syncing}
-        className={`w-full py-4 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${saved ? 'bg-[#4CAF50]' : 'bg-[#E94560]'}`}
+        className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${saved ? 'bg-[#4CAF50] text-white' : 'bg-[#4FC3F7] text-[#0F2027]'}`}
         whileTap={{ scale: 0.97 }}
       >
         {syncing ? <RefreshCw size={18} className="animate-spin" /> : saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
@@ -256,8 +256,8 @@ export default function TodayView() {
       </p>
 
       {weekConfig?.week_focus && (
-        <div className="mt-6 p-4 bg-[#1A1A2E] rounded-2xl border border-[#E94560]/20">
-          <p className="text-xs text-[#E94560] font-semibold mb-1">WEEK FOCUS</p>
+        <div className="mt-6 p-4 bg-[#1A1A2E] rounded-2xl border border-[#4FC3F7]/20">
+          <p className="text-xs text-[#4FC3F7] font-semibold mb-1">WEEK FOCUS</p>
           <p className="text-sm text-[#B0BEC5]">{weekConfig.week_focus}</p>
         </div>
       )}
