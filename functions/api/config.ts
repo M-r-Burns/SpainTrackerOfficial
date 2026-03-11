@@ -6,7 +6,7 @@ interface Env {
 }
 
 export const onRequestGet = ({ env }: { env: Env }) => {
-  const googleClientId = env.VITE_GOOGLE_CLIENT_ID || env.GOOGLE_CLIENT_ID || ''
+  const googleClientId = env.GOOGLE_CLIENT_ID || env.VITE_GOOGLE_CLIENT_ID || ''
   const sheetId = env.VITE_SHEET_ID || env.SHEET_ID || ''
 
   return new Response(JSON.stringify({ googleClientId, sheetId }), {
