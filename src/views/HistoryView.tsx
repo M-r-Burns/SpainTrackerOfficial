@@ -1,27 +1,18 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import { useProgressStore } from '../store/useProgressStore'
 import HeatmapCalendar from '../components/HeatmapCalendar'
-
-type HeatField = 'flashcard_done' | 'gym_done' | 'class_attended'
-
-const FIELDS: { key: HeatField; label: string }[] = [
-  { key: 'flashcard_done', label: '🃏 Flashcards' },
-  { key: 'gym_done', label: '💪 Gym' },
-  { key: 'class_attended', label: '📚 Class' },
-]
+import { formatIsoDateForDisplay, isOnOrBeforeMadridToday } from '../utils/madridTime'
 
 export default function HistoryView() {
   const { dailyLog, isAuthenticated } = useProgressStore()
-  const [field, setField] = useState<HeatField>('flashcard_done')
 
   if (!isAuthenticated) return (
     <div className="flex items-center justify-center min-h-[80vh] text-[#B0BEC5]">Connect Google account in Settings</div>
   )
 
-  const today = new Date()
   const past = [...dailyLog]
-    .filter(r => r.date && new Date(r.date) <= today)
+    .filter(r => r.date && isOnOrBeforeMadridToday(r.date))
     .sort((a, b) => b.day_number - a.day_number)
 
   return (
@@ -29,15 +20,8 @@ export default function HistoryView() {
       <h1 className="text-2xl font-bold text-white mb-4">History</h1>
 
       <div className="bg-[#1A1A2E] rounded-2xl p-4 mb-6">
-        <div className="flex gap-2 mb-4">
-          {FIELDS.map(f => (
-            <button key={f.key} onClick={() => setField(f.key)}
-              className={`flex-1 text-xs py-2 rounded-xl transition-all ${field === f.key ? 'bg-[#E94560] text-white' : 'bg-[#16213E] text-[#B0BEC5]'}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <HeatmapCalendar log={dailyLog} field={field} />
+        <h2 className="text-sm font-semibold text-[#B0BEC5] uppercase tracking-wider mb-3">Daily Intensity</h2>
+        <HeatmapCalendar log={dailyLog} />
       </div>
 
       <div className="space-y-3">
@@ -46,7 +30,7 @@ export default function HistoryView() {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="font-semibold text-white text-sm">Day {day.day_number}</span>
-                <span className="text-[#B0BEC5] text-xs ml-2">{new Date(day.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                <span className="text-[#B0BEC5] text-xs ml-2">{formatIsoDateForDisplay(day.date, 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
               </div>
               <div className="flex gap-1">
                 {day.flashcard_done && <span title="Flashcards">🃏</span>}

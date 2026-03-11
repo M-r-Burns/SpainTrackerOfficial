@@ -2,6 +2,14 @@ import { create } from 'zustand'
 import type { AppState, ConfigRow, DailyLogRow } from '../types'
 import { fetchConfig, fetchDailyLog, getStartDate, writeDayLog } from '../api/sheets'
 import { computeStreakForField } from '../utils/calculations'
+import {
+  addDaysToIsoDate,
+  getIsoDayDifference,
+  getMadridTodayIso,
+  getWeekdayIndexFromIso,
+  getWeekdayNameFromIso,
+  isIsoOnOrBefore,
+} from '../utils/madridTime'
 
 interface ProgressStore extends AppState {
   setAuth: (token: string) => void
@@ -10,6 +18,9 @@ interface ProgressStore extends AppState {
   syncData: () => Promise<void>
   saveDay: (updates: Partial<DailyLogRow>) => Promise<void>
   updateTodayField: <K extends keyof DailyLogRow>(key: K, value: DailyLogRow[K]) => void
+  goToRelativeDay: (delta: number) => void
+  goToToday: () => void
+  refreshCurrentDayFromDeviceTime: () => boolean
   flashcardStreak: number
   gymStreak: number
 }
@@ -21,45 +32,34 @@ function isValidIsoDate(value: string): boolean {
   return !Number.isNaN(date.getTime())
 }
 
-function getCurrentDayInfo(log: DailyLogRow[], startDate: string): { dayNumber: number; weekNumber: number } {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().split('T')[0]
+function clampDayNumber(dayNumber: number): number {
+  return Math.max(1, Math.min(112, dayNumber))
+}
+
+function getCurrentDayInfo(log: DailyLogRow[], startDate: string, madridTodayIso: string): { dayNumber: number; weekNumber: number } {
+  const todayStr = madridTodayIso
 
   const found = log.find(r => r.date === todayStr)
   if (found) return { dayNumber: found.day_number, weekNumber: found.week_number }
 
   if (isValidIsoDate(startDate)) {
-    const start = new Date(startDate)
-    start.setHours(0, 0, 0, 0)
-    const diffMs = today.getTime() - start.getTime()
-    const diffDays = Math.floor(diffMs / 86400000)
+    const diffDays = getIsoDayDifference(startDate, madridTodayIso)
     const dayNumber = diffDays + 1
     const weekNumber = Math.ceil(dayNumber / 7)
     const safeDay = Number.isFinite(dayNumber) ? dayNumber : 1
     const safeWeek = Number.isFinite(weekNumber) ? weekNumber : 1
-    return { dayNumber: Math.max(1, Math.min(112, safeDay)), weekNumber: Math.max(1, Math.min(16, safeWeek)) }
+    return { dayNumber: clampDayNumber(safeDay), weekNumber: Math.max(1, Math.min(16, safeWeek)) }
   }
   return { dayNumber: 1, weekNumber: 1 }
 }
 
-function getTodayIsoDate(): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return today.toISOString().split('T')[0]
-}
-
 function getIsoDateFromStartDate(startDate: string, dayNumber: number): string {
-  if (!isValidIsoDate(startDate) || !Number.isFinite(dayNumber)) return getTodayIsoDate()
-  const start = new Date(startDate)
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() + (dayNumber - 1))
-  if (Number.isNaN(start.getTime())) return getTodayIsoDate()
-  return start.toISOString().split('T')[0]
+  if (!isValidIsoDate(startDate) || !Number.isFinite(dayNumber)) return getMadridTodayIso()
+  return addDaysToIsoDate(startDate, dayNumber - 1)
 }
 
 function getDayOfWeek(dateIso: string): string {
-  return new Date(dateIso).toLocaleDateString('en-US', { weekday: 'long' })
+  return getWeekdayNameFromIso(dateIso, 'en-US')
 }
 
 function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate: string): DailyLogRow {
@@ -67,7 +67,7 @@ function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate:
   const safeWeek = Number.isFinite(weekNumber) ? Math.max(1, Math.min(16, Math.round(weekNumber))) : 1
   const date = getIsoDateFromStartDate(startDate, safeDay)
   const weekday = getDayOfWeek(date)
-  const weekdayIndex = new Date(date).getDay()
+  const weekdayIndex = getWeekdayIndexFromIso(date)
   const isClassDay = weekdayIndex >= 1 && weekdayIndex <= 5
   const isMorningClass = weekdayIndex === 1 || weekdayIndex === 3 || weekdayIndex === 5
 
@@ -94,12 +94,12 @@ function createDefaultDailyRow(dayNumber: number, weekNumber: number, startDate:
   }
 }
 
-function resolveTodayRow(log: DailyLogRow[], dayNumber: number, weekNumber: number, startDate: string): DailyLogRow {
-  const today = getTodayIsoDate()
+function resolveDayRow(log: DailyLogRow[], dayNumber: number, weekNumber: number, startDate: string, fallbackTodayIso: string): DailyLogRow {
+  const safeDay = clampDayNumber(dayNumber)
+  const safeWeek = Math.max(1, Math.min(16, weekNumber))
   return (
-    log.find(r => r.date === today) ??
-    log.find(r => r.day_number === dayNumber) ??
-    createDefaultDailyRow(dayNumber, weekNumber, startDate)
+    log.find(r => r.day_number === safeDay) ??
+    createDefaultDailyRow(safeDay, safeWeek, isValidIsoDate(startDate) ? startDate : fallbackTodayIso)
   )
 }
 
@@ -135,9 +135,12 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
   startDate: '',
   configRows: [],
   dailyLog: [],
-  todayRow: null,
+  selectedRow: null,
   currentDayNumber: 1,
   currentWeekNumber: 1,
+  selectedDayNumber: 1,
+  selectedWeekNumber: 1,
+  madridDateIso: getMadridTodayIso(),
   loading: false,
   syncing: false,
   lastSynced: null,
@@ -164,23 +167,27 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     if (!accessToken || !sheetId) return
     set({ syncing: true, error: null })
     try {
+      const madridTodayIso = getMadridTodayIso()
       const [config, log, fetchedStartDate] = await Promise.all([
         fetchConfig(accessToken, sheetId),
         fetchDailyLog(accessToken, sheetId),
         getStartDate(accessToken, sheetId),
       ])
       const activeStartDate = isValidIsoDate(fetchedStartDate) ? fetchedStartDate : get().startDate
-      const { dayNumber, weekNumber } = getCurrentDayInfo(log, activeStartDate)
-      const todayRow = resolveTodayRow(log, dayNumber, weekNumber, activeStartDate)
-      const flashcardStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'flashcard_done')
-      const gymStreak = computeStreakForField(log.filter(r => r.date && new Date(r.date) <= new Date()), 'gym_done')
+      const { dayNumber, weekNumber } = getCurrentDayInfo(log, activeStartDate, madridTodayIso)
+      const selectedRow = resolveDayRow(log, dayNumber, weekNumber, activeStartDate, madridTodayIso)
+      const flashcardStreak = computeStreakForField(log.filter(r => r.date && isIsoOnOrBefore(r.date, madridTodayIso)), 'flashcard_done')
+      const gymStreak = computeStreakForField(log.filter(r => r.date && isIsoOnOrBefore(r.date, madridTodayIso)), 'gym_done')
       set({
         startDate: activeStartDate,
         configRows: config,
         dailyLog: log,
-        todayRow,
+        selectedRow,
         currentDayNumber: dayNumber,
         currentWeekNumber: weekNumber,
+        selectedDayNumber: dayNumber,
+        selectedWeekNumber: weekNumber,
+        madridDateIso: madridTodayIso,
         lastSynced: new Date(),
         flashcardStreak,
         gymStreak,
@@ -188,35 +195,100 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
       })
     } catch (e) {
       const { dailyLog, currentDayNumber, currentWeekNumber, startDate } = get()
+      const madridTodayIso = getMadridTodayIso()
       set({
         error: (e as Error).message,
         syncing: false,
-        todayRow: resolveTodayRow(dailyLog, currentDayNumber, currentWeekNumber, startDate),
+        madridDateIso: madridTodayIso,
+        selectedRow: resolveDayRow(dailyLog, currentDayNumber, currentWeekNumber, startDate, madridTodayIso),
+        selectedDayNumber: currentDayNumber,
+        selectedWeekNumber: currentWeekNumber,
       })
     }
   },
 
   updateTodayField: (key, value) => {
-    const { todayRow, currentDayNumber, currentWeekNumber, startDate } = get()
-    const baseRow = todayRow ?? createDefaultDailyRow(currentDayNumber, currentWeekNumber, startDate)
-    set({ todayRow: { ...baseRow, [key]: value } })
+    const { selectedRow, selectedDayNumber, selectedWeekNumber, startDate, madridDateIso } = get()
+    const baseRow = selectedRow ?? resolveDayRow([], selectedDayNumber, selectedWeekNumber, startDate, madridDateIso)
+    set({ selectedRow: { ...baseRow, [key]: value } })
+  },
+
+  goToRelativeDay: (delta) => {
+    if (!Number.isFinite(delta) || delta === 0) return
+    const { selectedDayNumber, dailyLog, startDate, madridDateIso } = get()
+    const targetDayNumber = clampDayNumber(selectedDayNumber + Math.round(delta))
+    if (targetDayNumber === selectedDayNumber) return
+    const targetWeekNumber = Math.ceil(targetDayNumber / 7)
+    set({
+      selectedDayNumber: targetDayNumber,
+      selectedWeekNumber: targetWeekNumber,
+      selectedRow: resolveDayRow(dailyLog, targetDayNumber, targetWeekNumber, startDate, madridDateIso),
+    })
+  },
+
+  goToToday: () => {
+    const { currentDayNumber, currentWeekNumber, dailyLog, startDate, madridDateIso } = get()
+    set({
+      selectedDayNumber: currentDayNumber,
+      selectedWeekNumber: currentWeekNumber,
+      selectedRow: resolveDayRow(dailyLog, currentDayNumber, currentWeekNumber, startDate, madridDateIso),
+    })
+  },
+
+  refreshCurrentDayFromDeviceTime: () => {
+    const { dailyLog, startDate, madridDateIso, currentDayNumber, selectedDayNumber } = get()
+    const localTodayIso = getMadridTodayIso()
+    if (localTodayIso === madridDateIso) return false
+
+    const { dayNumber, weekNumber } = getCurrentDayInfo(dailyLog, startDate, localTodayIso)
+    const wasViewingCurrentDay = selectedDayNumber === currentDayNumber
+    const nextSelectedDayNumber = wasViewingCurrentDay ? dayNumber : selectedDayNumber
+    const nextSelectedWeekNumber = Math.ceil(nextSelectedDayNumber / 7)
+
+    set({
+      madridDateIso: localTodayIso,
+      currentDayNumber: dayNumber,
+      currentWeekNumber: weekNumber,
+      selectedDayNumber: nextSelectedDayNumber,
+      selectedWeekNumber: nextSelectedWeekNumber,
+      selectedRow: resolveDayRow(dailyLog, nextSelectedDayNumber, nextSelectedWeekNumber, startDate, localTodayIso),
+      flashcardStreak: computeStreakForField(dailyLog.filter(r => r.date && isIsoOnOrBefore(r.date, localTodayIso)), 'flashcard_done'),
+      gymStreak: computeStreakForField(dailyLog.filter(r => r.date && isIsoOnOrBefore(r.date, localTodayIso)), 'gym_done'),
+    })
+    return true
   },
 
   saveDay: async (updates) => {
-    const { accessToken, sheetId, todayRow, dailyLog, currentDayNumber, currentWeekNumber, startDate } = get()
+    const {
+      accessToken,
+      sheetId,
+      selectedRow,
+      dailyLog,
+      selectedDayNumber,
+      selectedWeekNumber,
+      startDate,
+      madridDateIso,
+    } = get()
     if (!accessToken || !sheetId) return
-    const baseRow = todayRow ?? createDefaultDailyRow(currentDayNumber, currentWeekNumber, startDate)
+    const baseRow = selectedRow ?? resolveDayRow(dailyLog, selectedDayNumber, selectedWeekNumber, startDate, madridDateIso)
     const updated = { ...baseRow, ...updates }
-    set({ todayRow: updated, syncing: true })
+    set({ selectedRow: updated, syncing: true })
     try {
       await writeDayLog(accessToken, sheetId, updated.day_number, dailyRowToArray(updated))
       const hasExistingDay = dailyLog.some(r => r.day_number === updated.day_number)
       const newLog = hasExistingDay
         ? dailyLog.map(r => r.day_number === updated.day_number ? updated : r)
         : [...dailyLog, updated].sort((a, b) => a.day_number - b.day_number)
-      const flashcardStreak = computeStreakForField(newLog.filter(r => r.date && new Date(r.date) <= new Date()), 'flashcard_done')
-      const gymStreak = computeStreakForField(newLog.filter(r => r.date && new Date(r.date) <= new Date()), 'gym_done')
-      set({ dailyLog: newLog, flashcardStreak, gymStreak, syncing: false, lastSynced: new Date() })
+      const flashcardStreak = computeStreakForField(newLog.filter(r => r.date && isIsoOnOrBefore(r.date, madridDateIso)), 'flashcard_done')
+      const gymStreak = computeStreakForField(newLog.filter(r => r.date && isIsoOnOrBefore(r.date, madridDateIso)), 'gym_done')
+      set({
+        dailyLog: newLog,
+        selectedRow: updated,
+        flashcardStreak,
+        gymStreak,
+        syncing: false,
+        lastSynced: new Date(),
+      })
     } catch (e) {
       set({ error: (e as Error).message, syncing: false })
     }

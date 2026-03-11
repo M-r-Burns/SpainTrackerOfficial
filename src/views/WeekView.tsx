@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useProgressStore } from '../store/useProgressStore'
 import { getWeekCategoryProgress } from '../utils/calculations'
 import AheadBehindChip from '../components/AheadBehindChip'
+import { formatIsoDateForDisplay, isOnOrBeforeMadridToday } from '../utils/madridTime'
 
 export default function WeekView() {
   const { configRows, dailyLog, currentWeekNumber, isAuthenticated } = useProgressStore()
@@ -14,12 +15,11 @@ export default function WeekView() {
   const weekConfig = configRows.find(c => c.week_number === currentWeekNumber)
   const categories = getWeekCategoryProgress(configRows, dailyLog, currentWeekNumber)
   const weekLog = dailyLog.filter(r => r.week_number === currentWeekNumber)
-  const today = new Date()
-  const daysElapsed = weekLog.filter(r => r.date && new Date(r.date) <= today).length
+  const daysElapsed = weekLog.filter(r => r.date && isOnOrBeforeMadridToday(r.date)).length
   const daysRemaining = 7 - daysElapsed
 
   const dates = weekLog.map(r => r.date).filter(Boolean).sort()
-  const dateRange = dates.length >= 2 ? `${new Date(dates[0]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(dates[dates.length-1]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''
+  const dateRange = dates.length >= 2 ? `${formatIsoDateForDisplay(dates[0], 'en-GB', { day: 'numeric', month: 'short' })} – ${formatIsoDateForDisplay(dates[dates.length-1], 'en-GB', { day: 'numeric', month: 'short' })}` : ''
 
   return (
     <motion.div className="p-4 max-w-lg mx-auto" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

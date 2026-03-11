@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, RefreshCw, Save } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, RefreshCw, Save } from 'lucide-react'
 import { useProgressStore } from '../store/useProgressStore'
 import StreakCounter from '../components/StreakCounter'
 import type { DailyLogRow } from '../types'
+import { formatIsoDateForDisplay, getWeekdayIndexFromIso, getWeekdayNameFromIso } from '../utils/madridTime'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -95,22 +96,39 @@ function PodcastMinutesInput({ minutes, onChangeMinutes }: { minutes: number; on
 }
 
 export default function TodayView() {
-  const { todayRow, currentDayNumber, currentWeekNumber, configRows, isAuthenticated,
-    updateTodayField, saveDay, syncData, syncing, lastSynced, flashcardStreak, gymStreak } = useProgressStore()
+  const {
+    selectedRow,
+    selectedDayNumber,
+    selectedWeekNumber,
+    currentDayNumber,
+    currentWeekNumber,
+    configRows,
+    isAuthenticated,
+    updateTodayField,
+    saveDay,
+    syncData,
+    syncing,
+    lastSynced,
+    flashcardStreak,
+    gymStreak,
+    goToRelativeDay,
+    goToToday,
+    refreshCurrentDayFromDeviceTime,
+    madridDateIso,
+  } = useProgressStore()
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  const weekConfig = configRows.find(c => c.week_number === currentWeekNumber)
-  const today = new Date()
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const weekConfig = configRows.find(c => c.week_number === selectedWeekNumber)
+  const isViewingToday = selectedDayNumber === currentDayNumber
 
   const fallbackRow: DailyLogRow = {
-    day_number: currentDayNumber,
-    week_number: currentWeekNumber,
-    date: today.toISOString().split('T')[0],
-    day_of_week: today.toLocaleDateString('en-US', { weekday: 'long' }),
-    is_class_day: [1, 2, 3, 4, 5].includes(today.getDay()),
-    is_morning_class: [1, 3, 5].includes(today.getDay()),
+    day_number: selectedDayNumber,
+    week_number: selectedWeekNumber,
+    date: madridDateIso,
+    day_of_week: getWeekdayNameFromIso(madridDateIso, 'en-US'),
+    is_class_day: [1, 2, 3, 4, 5].includes(getWeekdayIndexFromIso(madridDateIso)),
+    is_morning_class: [1, 3, 5].includes(getWeekdayIndexFromIso(madridDateIso)),
     book_chapter_completed: false,
     podcast_done: 0,
     flashcard_done: false,
@@ -126,7 +144,13 @@ export default function TodayView() {
     notes: '',
   }
 
-  const activeRow = todayRow ?? fallbackRow
+  const activeRow = selectedRow ?? fallbackRow
+  const dateStr = formatIsoDateForDisplay(activeRow.date, 'en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
   const podcastMinutes = Math.round(activeRow.podcast_done * 60)
 
   const classLabel = activeRow.is_morning_class ? '🌅 Morning Class' : activeRow.is_class_day ? '🌆 Afternoon Class' : '🏠 No Class Today'
@@ -135,6 +159,25 @@ export default function TodayView() {
     setDirty(true)
     updateTodayField(key, value)
   }
+
+  useEffect(() => {
+    setDirty(false)
+    setSaved(false)
+  }, [selectedDayNumber])
+
+  useEffect(() => {
+    const changedOnMount = refreshCurrentDayFromDeviceTime()
+    if (changedOnMount) {
+      void syncData()
+    }
+    const timer = window.setInterval(() => {
+      const changed = refreshCurrentDayFromDeviceTime()
+      if (changed) {
+        void syncData()
+      }
+    }, 10000)
+    return () => window.clearInterval(timer)
+  }, [refreshCurrentDayFromDeviceTime, syncData])
 
   async function handleSave() {
     await saveDay(activeRow)
@@ -167,7 +210,33 @@ export default function TodayView() {
           </button>
         </div>
         <h1 className="text-3xl font-bold text-white tracking-tight">Home Dashboard</h1>
-        <p className="text-sm text-[#B0BEC5] mt-1">Day {currentDayNumber} of 112 — Week {currentWeekNumber}</p>
+        <p className="text-sm text-[#B0BEC5] mt-1">Day {selectedDayNumber} of 112 — Week {selectedWeekNumber}</p>
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => goToRelativeDay(-1)}
+            disabled={selectedDayNumber <= 1}
+            className="h-9 w-9 rounded-lg bg-[#16213E] text-white disabled:opacity-40 flex items-center justify-center"
+            aria-label="Go to previous day"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            onClick={goToToday}
+            disabled={isViewingToday}
+            className="h-9 px-3 rounded-lg bg-[#16213E] text-xs text-white disabled:opacity-40"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => goToRelativeDay(1)}
+            disabled={selectedDayNumber >= 112}
+            className="h-9 w-9 rounded-lg bg-[#16213E] text-white disabled:opacity-40 flex items-center justify-center"
+            aria-label="Go to next day"
+          >
+            <ChevronRight size={16} />
+          </button>
+          {!isViewingToday && <span className="text-xs text-[#4FC3F7]">Viewing another day</span>}
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {weekConfig && <span className="inline-block text-xs bg-[#4FC3F7]/15 border border-[#4FC3F7]/35 px-3 py-1 rounded-full text-[#4FC3F7]">{weekConfig.phase}</span>}
           <span className="inline-block text-xs bg-[#16213E] px-3 py-1 rounded-full text-[#B0BEC5]">{classLabel}</span>

@@ -39,9 +39,12 @@ export interface AppState {
   startDate: string
   configRows: ConfigRow[]
   dailyLog: DailyLogRow[]
-  todayRow: DailyLogRow | null
+  selectedRow: DailyLogRow | null
   currentDayNumber: number
   currentWeekNumber: number
+  selectedDayNumber: number
+  selectedWeekNumber: number
+  madridDateIso: string
   loading: boolean
   syncing: boolean
   lastSynced: Date | null

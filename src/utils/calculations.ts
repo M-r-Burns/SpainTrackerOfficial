@@ -1,4 +1,5 @@
 import type { ConfigRow, DailyLogRow, CategoryProgress } from '../types'
+import { isOnOrBeforeMadridToday } from './madridTime'
 
 export function computeStreaks(log: DailyLogRow[]): { flashcard: number; gym: number } {
   return {
@@ -53,8 +54,7 @@ export function getWeekCategoryProgress(
   if (!weekConfig) return []
 
   const weekLog = log.filter(r => r.week_number === weekNumber)
-  const today = new Date()
-  const daysElapsed = weekLog.filter(r => r.date && new Date(r.date) <= today).length
+  const daysElapsed = weekLog.filter(r => r.date && isOnOrBeforeMadridToday(r.date)).length
 
   const categories: CategoryProgress[] = [
     {
@@ -113,9 +113,7 @@ export function getOverallCategoryProgress(
   currentDayInWeek: number
 ): CategoryProgress[] {
   const totalWeeks = 16
-  const today = new Date()
-
-  const loggedDays = log.filter(r => r.date && new Date(r.date) <= today)
+  const loggedDays = log.filter(r => r.date && isOnOrBeforeMadridToday(r.date))
 
   const actuals = {
     spanish: loggedDays.filter(r => r.class_attended).length,

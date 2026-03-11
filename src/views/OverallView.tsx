@@ -4,6 +4,7 @@ import { useProgressStore } from '../store/useProgressStore'
 import { getOverallCategoryProgress } from '../utils/calculations'
 import ProgressRing from '../components/ProgressRing'
 import AheadBehindChip from '../components/AheadBehindChip'
+import { isOnOrBeforeMadridToday } from '../utils/madridTime'
 
 const PHASES = [
   { weeks: [1,4], label: 'Foundation', color: '#1565C0' },
@@ -19,8 +20,7 @@ export default function OverallView() {
     <div className="flex items-center justify-center min-h-[80vh] text-[#B0BEC5]">Connect Google account in Settings</div>
   )
 
-  const today = new Date()
-  const loggedDays = dailyLog.filter(r => r.date && new Date(r.date) <= today)
+  const loggedDays = dailyLog.filter(r => r.date && isOnOrBeforeMadridToday(r.date))
   const currentDayInWeek = loggedDays.filter(r => r.week_number === currentWeekNumber).length
 
   const categories = getOverallCategoryProgress(configRows, dailyLog, currentWeekNumber, currentDayInWeek)
