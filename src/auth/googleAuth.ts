@@ -110,6 +110,8 @@ export async function startOAuthFlow(options?: OAuthFlowOptions): Promise<void> 
   const challenge = await generateCodeChallenge(verifier)
   const state = base64URLEncode(crypto.getRandomValues(new Uint8Array(16)).buffer)
 
+  localStorage.removeItem('manual_logout')
+
   localStorage.setItem('pkce_verifier', verifier)
   localStorage.setItem('pkce_state', state)
 
@@ -176,4 +178,7 @@ export function logout(): void {
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('pkce_verifier')
   localStorage.removeItem('pkce_state')
+  localStorage.removeItem('ever_authenticated')
+  localStorage.setItem('manual_logout', '1')
+  sessionStorage.removeItem('silent_oauth_attempted')
 }

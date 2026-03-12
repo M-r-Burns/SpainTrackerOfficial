@@ -53,8 +53,9 @@ export default function App() {
 
   const shouldTrySilentReauth = () => {
     const everAuthenticated = localStorage.getItem('ever_authenticated') === '1'
+    const manualLogout = localStorage.getItem('manual_logout') === '1'
     const triedThisSession = sessionStorage.getItem('silent_oauth_attempted') === '1'
-    return everAuthenticated && !triedThisSession
+    return everAuthenticated && !manualLogout && !triedThisSession
   }
 
   useEffect(() => {
